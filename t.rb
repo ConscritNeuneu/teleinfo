@@ -1,6 +1,12 @@
 require "json"
 require "serialport"
 require "thread"
+require "sqlite3"
+
+GENERAL_METER = "/dev/ttyAMA0"
+SPECIAL_METER = "/dev/ttyAMA1"
+SPECIAL_METER_ID = 1
+METER_DATABASE = "/home/quentin/index_reports.sqlite3"
 
 def validate_historic(sub_group)
   data = sub_group[0..-3]
@@ -52,20 +58,128 @@ def read_trame(io)
   end
 end
 
-system("stty raw 1200 -parodd -cstopb cs7 < /dev/ttyS0")
-SerialPort.open("/dev/ttyS0") do |io|
-  i = 0
-  loop do
-    trame = read_trame(io)
-    if trame
-      infos = parse_trame(trame)
-      File.open("/home/quentin/teleinfo/trame_#{i}.txt", "wb") { |f| f.write(trame) }
-      File.open("/home/quentin/teleinfo/trame_#{i}.json", "wb") { |f| f.write(JSON.pretty_generate(infos)) }
-      i += 1
+def read_meter_info(file, &block) # never returns
+  system("stty raw 1200 -parodd -cstopb cs7 < #{file}")
+  SerialPort.open(file) do |io|
+    loop do
+      trame = read_trame(io)
+      if trame
+        infos = parse_trame(trame)
+        if !infos.empty?
+          yield infos
+        end
+      end
     end
   end
 end
 
+def sum_indexes(meter_info)
+  [
+    %w(BASE),
+    %w(HCHC HCHP),
+    %w(BBRHCJB BBRHPJB BBRHCJW BBRHPJW BBRHCJR BBRHPJR),
+  ].each do |indexes|
+    indexes.map { |key| meter_info[key] }
+    if indexes.all?
+      return indexes.map(&:to_i).sum
+    end
+  end
+end
+
+def setup_database(file)
+  db = SQLite3::Database.new(meters_database)
+
+  db.execute('CREATE TABLE IF NOT EXISTS index_reports (id INTEGER PRIMARY KEY AUTOINCREMENT, meter_id INTEGER NOT NULL, created_at TEXT NOT NULL, indexes TEXT NOT NULL);')
+  db.execute('CREATE TABLE IF NOT EXISTS incidents(id INTEGER PRIMARY KEY, created_at TEXT NOT NULL, incident TEXT NOT NULL);')
+
+  db
+end
+
+def get_indexes(db, meter_id)
+  id, indexes = db.execute('SELECT id, indexes FROM index_reports WHERE meter_id = ? ORDER BY id DESC LIMIT 1;', [meter_id]).first
+  indexes = JSON.parse(indexes)
+  record_incident(db, "read indexes from database, id #{id}")
+end
+
+def save_indexes(db, meter_id, indexes)
+  db.execute('INSERT INTO index_reports (meter_id, created_at, indexes) VALUES (?, datetime(), ?);', [meter_id, JSON.generate(indexes)])
+end
+
+def record_incident(db, text)
+  db.execute('INSERT INTO incidents (created_at, incident) VALUES (datetime(), ?);', [text])
+end
+
+db = setup_database(METER_DATABASE)
+
+general_meter_current_index_name = "unknown"
+general_meter_current_index_time = Time.now
+special_meter_index_sync = false
+special_meter_index_split = get_indexes(db, SPECIAL_METER_ID)
+
+INDEXES = {
+  "HCJB" => "blue_off_peak",
+  "HCJW" => "white_off_peak",
+  "HCJR" => "red_off_peak",
+  "HPJB" => "blue_peak",
+  "HPJW" => "white_peak",
+  "HPJR" => "red_peak"
+}
+
+Thread.new do
+  read_meter_info(GENERAL_METER) do |meter_info|
+    ptec = meter_info["PTEC"]
+    if ptec && INDEXES[ptec]
+      if INDEXES[ptec] != general_meter_current_index_name
+        record_incident("Setting general meter index from #{general_meter_current_index_name} to #{INDEXES[ptec]}")
+      end
+      general_meter_current_index_name = INDEXES[ptec]
+      general_meter_current_index_time = Time.now
+    end
+  end
+end
+
+Thread.new do
+  read_meter_info(SPECIAL_METER) do |meter_info|
+    old_sum = special_meter_index_split.sum { |_, idx| idx }
+    new_sum = sum_indexes(meter_info)
+    if !special_meter_index_sync
+      if old_sum != new_sum
+        special_meter_index_split["unknown"] ||= 0
+        special_meter_index_split["unknown"] += new_sum - old_sum
+        save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
+        record_incident(db, "adjust unknown index from meter #{SPECIAL_METER_ID} by #{new_sum - old_sum}Wh")
+      end
+      special_meter_index_sync = true
+    else
+      if (new_sum - old_sum) > 0
+        special_meter_index_split[general_meter_current_index_name] ||= 0
+        special_meter_index_split[general_meter_current_index_name] += new_sum - old_sum
+        if general_meter_current_index_name == "unknown"
+          record_incident(db, "ventilate #{new_sum - old_sum}Wh of meter #{SPECIAL_METER_ID} into the unknown index")
+        end
+      elsif (new_sum - old_sum) < 0
+        special_meter_index_split["unknown"] ||= 0
+        special_meter_index_split["unknown"] += new_sum - old_sum
+        save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
+        record_incident(db, "negative consumption of #{SPECIAL_METER_ID} of #{new_sum - old_sum}Wh")
+      end
+    end
+  end
+end
+
+Signal.Trap("INT") do
+  save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
+end
+
+loop do
+  sleep(1800)
+  save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
+  if (Time.now - general_meter_current_index_time) >= 1800
+    general_meter_current_index_name = "unknown"
+    general_meter_current_index_time = Time.now
+    record_incident(db, "Reverting general meter index to unknown. Last update was #{general_meter_current_index_update}.")
+  end
+end
 #trame = "\x02\nADCO 811775412275 I\r\nOPTARIF HC.. <\r\nISOUSC 45 ?\r\nHCHC 004070290 \\\r\nHCHP 006438891 :\r\nPTEC HP..  \r\nIINST 004 [\r\nIMAX 090 H\r\nPAPP 01090 +\r\nHHPHC A ,\r\nMOTDETAT 000000 B\r\x03"
 #groups = trame[1..-2]
 #infos = parse_trame(groups)
