@@ -109,14 +109,6 @@ def record_incident(db, text)
   db.execute('INSERT INTO incidents (created_at, incident) VALUES (datetime(), ?);', [text])
 end
 
-db = setup_database(METER_DATABASE)
-
-general_meter_current_index_name = "unknown"
-general_meter_current_index_time = Time.now
-special_meter_index_sync = false
-special_meter_index_split = get_indexes(db, SPECIAL_METER_ID)
-record_incident(db, "read indexes from database for meter #{id}")
-
 INDEXES = {
   "HCJB" => "blue_off_peak",
   "HCJW" => "white_off_peak",
@@ -125,6 +117,15 @@ INDEXES = {
   "HPJW" => "white_peak",
   "HPJR" => "red_peak"
 }
+UNKNOWN_INDEX = "unknown"
+
+db = setup_database(METER_DATABASE)
+
+general_meter_current_index_name = UNKNOWN_INDEX
+general_meter_current_index_time = Time.now
+special_meter_index_sync = false
+special_meter_index_split = get_indexes(db, SPECIAL_METER_ID)
+record_incident(db, "read indexes from database for meter #{id}")
 
 Thread.new do
   read_meter_info(GENERAL_METER) do |meter_info|
@@ -145,8 +146,8 @@ Thread.new do
     new_sum = sum_indexes(meter_info)
     if !special_meter_index_sync
       if old_sum != new_sum
-        special_meter_index_split["unknown"] ||= 0
-        special_meter_index_split["unknown"] += new_sum - old_sum
+        special_meter_index_split[UNKNOWN_INDEX] ||= 0
+        special_meter_index_split[UNKNOWN_INDEX] += new_sum - old_sum
         save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
         record_incident(db, "adjust unknown index from meter #{SPECIAL_METER_ID} by #{new_sum - old_sum}Wh")
       end
@@ -155,12 +156,12 @@ Thread.new do
       if (new_sum - old_sum) > 0
         special_meter_index_split[general_meter_current_index_name] ||= 0
         special_meter_index_split[general_meter_current_index_name] += new_sum - old_sum
-        if general_meter_current_index_name == "unknown"
+        if general_meter_current_index_name == UNKNOWN_INDEX
           record_incident(db, "ventilate #{new_sum - old_sum}Wh of meter #{SPECIAL_METER_ID} into the unknown index")
         end
       elsif (new_sum - old_sum) < 0
-        special_meter_index_split["unknown"] ||= 0
-        special_meter_index_split["unknown"] += new_sum - old_sum
+        special_meter_index_split[UNKNOWN_INDEX] ||= 0
+        special_meter_index_split[UNKNOWN_INDEX] += new_sum - old_sum
         save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
         record_incident(db, "negative consumption of #{SPECIAL_METER_ID} of #{new_sum - old_sum}Wh")
       end
@@ -176,7 +177,7 @@ loop do
   sleep(1800)
   save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
   if (Time.now - general_meter_current_index_time) >= 1800
-    general_meter_current_index_name = "unknown"
+    general_meter_current_index_name = UNKNOWN_INDEX
     general_meter_current_index_time = Time.now
     record_incident(db, "Reverting general meter index to unknown. Last update was #{general_meter_current_index_update}.")
   end
