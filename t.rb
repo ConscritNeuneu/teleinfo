@@ -86,7 +86,7 @@ def sum_indexes(meter_info)
   end
 end
 
-def setup_database(file)
+def setup_database(meters_database)
   db = SQLite3::Database.new(meters_database)
 
   db.execute('CREATE TABLE IF NOT EXISTS index_reports (id INTEGER PRIMARY KEY AUTOINCREMENT, meter_id INTEGER NOT NULL, created_at TEXT NOT NULL, indexes TEXT NOT NULL);')
@@ -97,8 +97,8 @@ end
 
 def get_indexes(db, meter_id)
   id, indexes = db.execute('SELECT id, indexes FROM index_reports WHERE meter_id = ? ORDER BY id DESC LIMIT 1;', [meter_id]).first
-  indexes = JSON.parse(indexes)
-  record_incident(db, "read indexes from database, id #{id}")
+  
+  JSON.parse(indexes || '{}')
 end
 
 def save_indexes(db, meter_id, indexes)
@@ -115,6 +115,7 @@ general_meter_current_index_name = "unknown"
 general_meter_current_index_time = Time.now
 special_meter_index_sync = false
 special_meter_index_split = get_indexes(db, SPECIAL_METER_ID)
+record_incident(db, "read indexes from database for meter #{id}")
 
 INDEXES = {
   "HCJB" => "blue_off_peak",
