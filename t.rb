@@ -109,6 +109,11 @@ def record_incident(db, text)
   db.execute('INSERT INTO incidents (created_at, incident) VALUES (datetime(), ?);', [text])
 end
 
+def adjust_index(split, index_name, value)
+  split[index_name] ||= 0
+  split[index_name] += value
+end
+
 INDEXES = {
   "HCJB" => "blue_off_peak",
   "HCJW" => "white_off_peak",
@@ -144,26 +149,24 @@ Thread.new do
   read_meter_info(SPECIAL_METER) do |meter_info|
     old_sum = special_meter_index_split.sum { |_, idx| idx }
     new_sum = sum_indexes(meter_info)
+    delta = new_sum - old_sum
     if !special_meter_index_sync
-      if old_sum != new_sum
-        special_meter_index_split[UNKNOWN_INDEX] ||= 0
-        special_meter_index_split[UNKNOWN_INDEX] += new_sum - old_sum
+      if delta != 0
+        adjust_index(special_meter_index_split, UNKNOWN_INDEX, delta)
         save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
-        record_incident(db, "adjust unknown index from meter #{SPECIAL_METER_ID} by #{new_sum - old_sum}Wh")
+        record_incident(db, "adjust unknown index from meter #{SPECIAL_METER_ID} by #{delta}Wh")
       end
       special_meter_index_sync = true
     else
-      if (new_sum - old_sum) > 0
-        special_meter_index_split[general_meter_current_index_name] ||= 0
-        special_meter_index_split[general_meter_current_index_name] += new_sum - old_sum
+      if delta > 0
+        adjust_index(special_meter_index_split, general_meter_current_index_name, delta)
         if general_meter_current_index_name == UNKNOWN_INDEX
-          record_incident(db, "ventilate #{new_sum - old_sum}Wh of meter #{SPECIAL_METER_ID} into the unknown index")
+          record_incident(db, "ventilate #{delta}Wh of meter #{SPECIAL_METER_ID} into the unknown index")
         end
-      elsif (new_sum - old_sum) < 0
-        special_meter_index_split[UNKNOWN_INDEX] ||= 0
-        special_meter_index_split[UNKNOWN_INDEX] += new_sum - old_sum
+      elsif delta < 0
+        adjust_index(special_meter_index_split, UNKNOWN_INDEX, delta)
         save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
-        record_incident(db, "negative consumption of #{SPECIAL_METER_ID} of #{new_sum - old_sum}Wh")
+        record_incident(db, "negative consumption of #{SPECIAL_METER_ID} of #{delta}Wh")
       end
     end
   end
