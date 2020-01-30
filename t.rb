@@ -98,7 +98,7 @@ end
 def get_indexes(db, meter_id)
   id, indexes = db.execute('SELECT id, indexes FROM index_reports WHERE meter_id = ? ORDER BY id DESC LIMIT 1;', [meter_id]).first
   
-  JSON.parse(indexes || '{}')
+  [id, JSON.parse(indexes || '{}')]
 end
 
 def save_indexes(db, meter_id, indexes)
@@ -129,8 +129,8 @@ db = setup_database(METER_DATABASE)
 general_meter_current_index_name = UNKNOWN_INDEX
 general_meter_current_index_time = Time.now
 special_meter_index_sync = false
-special_meter_index_split = get_indexes(db, SPECIAL_METER_ID)
-record_incident(db, "read indexes from database for meter #{id}")
+line_id , special_meter_index_split = get_indexes(db, SPECIAL_METER_ID)
+record_incident(db, "read indexes from database for meter #{id} with #{line_id}")
 
 Thread.new do
   read_meter_info(GENERAL_METER) do |meter_info|
