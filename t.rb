@@ -171,6 +171,7 @@ end
 
 Signal.Trap("INT") do
   save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
+  exit
 end
 
 loop do
