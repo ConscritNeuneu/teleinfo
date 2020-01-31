@@ -149,24 +149,26 @@ Thread.new do
   read_meter_info(SPECIAL_METER) do |meter_info|
     old_sum = special_meter_index_split.sum { |_, idx| idx }
     new_sum = sum_indexes(meter_info)
-    delta = new_sum - old_sum
-    if !special_meter_index_sync
-      if delta != 0
-        adjust_index(special_meter_index_split, UNKNOWN_INDEX, delta)
-        save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
-        record_incident(db, "adjust unknown index from meter #{SPECIAL_METER_ID} by #{delta}Wh")
-      end
-      special_meter_index_sync = true
-    else
-      if delta > 0
-        adjust_index(special_meter_index_split, general_meter_current_index_name, delta)
-        if general_meter_current_index_name == UNKNOWN_INDEX
-          record_incident(db, "ventilate #{delta}Wh of meter #{SPECIAL_METER_ID} into the unknown index")
+    if new_sum
+      delta = new_sum - old_sum
+      if !special_meter_index_sync
+        if delta != 0
+          adjust_index(special_meter_index_split, UNKNOWN_INDEX, delta)
+          save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
+          record_incident(db, "adjust unknown index from meter #{SPECIAL_METER_ID} by #{delta}Wh")
         end
-      elsif delta < 0
-        adjust_index(special_meter_index_split, UNKNOWN_INDEX, delta)
-        save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
-        record_incident(db, "negative consumption of #{SPECIAL_METER_ID} of #{delta}Wh")
+        special_meter_index_sync = true
+      else
+        if delta > 0
+          adjust_index(special_meter_index_split, general_meter_current_index_name, delta)
+          if general_meter_current_index_name == UNKNOWN_INDEX
+            record_incident(db, "ventilate #{delta}Wh of meter #{SPECIAL_METER_ID} into the unknown index")
+          end
+        elsif delta < 0
+          adjust_index(special_meter_index_split, UNKNOWN_INDEX, delta)
+          save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
+          record_incident(db, "negative consumption of #{SPECIAL_METER_ID} of #{delta}Wh")
+        end
       end
     end
   end
