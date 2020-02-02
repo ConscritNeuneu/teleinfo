@@ -3,6 +3,9 @@ require "serialport"
 require "thread"
 require "sqlite3"
 
+STANDARD_BAUD = 9600
+HISTORIC_BAUD = 1200
+
 GENERAL_METER = "/dev/ttyS0"
 SPECIAL_METER = "/dev/ttyAMA1"
 SPECIAL_METER_ID = 1
@@ -163,7 +166,7 @@ line_id , special_meter_index_split = get_indexes(db, SPECIAL_METER_ID)
 record_incident(db, "read indexes from database for meter #{SPECIAL_METER_ID} from line number #{line_id}")
 
 Thread.new do
-  read_meter_info(GENERAL_METER, 9600) do |meter_info|
+  read_meter_info(GENERAL_METER, STANDARD_BAUD) do |meter_info|
     mutex.synchronize do
       ptec = meter_info["NTARF"]
       if ptec && INDEXES[ptec]
@@ -178,7 +181,7 @@ Thread.new do
 end
 
 Thread.new do
-  read_meter_info(SPECIAL_METER, 1200) do |meter_info|
+  read_meter_info(SPECIAL_METER, HISTORIC_BAUD) do |meter_info|
     mutex.synchronize do
       old_sum = special_meter_index_split.sum { |_, idx| idx }
       new_sum = sum_indexes(meter_info)
