@@ -117,6 +117,7 @@ end
 
 def record_incident(db, text)
   db.execute('INSERT INTO incidents (created_at, incident) VALUES (datetime(), ?);', [text])
+  puts text + "\n"
 end
 
 def adjust_index(split, index_name, value)
@@ -190,12 +191,14 @@ Thread.new do
             record_incident(db, "adjust unknown index from meter #{SPECIAL_METER_ID} by #{delta} Wh")
           end
           special_meter_index_sync = true
+          puts "sync with #{delta}"
         else
           if delta > 0
             adjust_index(special_meter_index_split, general_meter_current_index_name, delta)
             if general_meter_current_index_name == UNKNOWN_INDEX
               record_incident(db, "ventilate #{delta} Wh of meter #{SPECIAL_METER_ID} into the unknown index")
             end
+            puts "add #{delta} to #{general_meter_current_index_name}"
           elsif delta < 0
             adjust_index(special_meter_index_split, UNKNOWN_INDEX, delta)
             save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
