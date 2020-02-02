@@ -3,7 +3,7 @@ require "serialport"
 require "thread"
 require "sqlite3"
 
-GENERAL_METER = "/dev/ttyAMA0"
+GENERAL_METER = "/dev/ttyS0"
 SPECIAL_METER = "/dev/ttyAMA1"
 SPECIAL_METER_ID = 1
 METER_DATABASE = "/home/quentin/index_reports.sqlite3"
@@ -16,11 +16,18 @@ def validate_historic(sub_group)
   (data.bytes.sum & 0x3f) + 0x20 == cksum.bytes[0]
 end
 
+def validate_standard(sub_group)
+  data = sub_group[0..-2]
+  cksum = sub_group[-1]
+
+  (data.bytes.sum & 0x3f) + 0x20 == cksum.bytes[0]
+end
+
 def parse_trame(trame)
   infos = {}
   trame.split("\n").each do |g|
     g.chomp!
-    if g.empty? || !validate_historic(g)
+    if g.empty? || !(validate_historic(g) || validate_standard(g))
       next
     end
     match = g.match('\A([^\t ]*)[\t ](.*)[\t ].\z')
@@ -59,16 +66,17 @@ def read_trame(io)
   end
 end
 
-def read_meter_info(file, &block) # never returns
-  system("stty raw 1200 -parodd -cstopb cs7 < #{file}")
-  SerialPort.open(file) do |io|
-    loop do
+def read_meter_info(file, baud, &block) # never returns
+  system("stty raw #{baud} -parodd -cstopb cs7 < #{file}")
+  loop do
+    trame = nil
+    SerialPort.open(file) do |io|
       trame = read_trame(io)
-      if trame
-        infos = parse_trame(trame)
-        if !infos.empty?
-          yield infos
-        end
+    end
+    if trame
+      infos = parse_trame(trame)
+      if !infos.empty?
+        yield infos
       end
     end
   end
@@ -76,12 +84,13 @@ end
 
 def sum_indexes(meter_info)
   [
+    %w(EAST),
     %w(BASE),
     %w(HCHC HCHP),
     %w(BBRHCJB BBRHPJB BBRHCJW BBRHPJW BBRHCJR BBRHPJR),
-  ].each do |indexes|
-    indexes.map { |key| meter_info[key] }
-    if indexes.all?
+  ].each do |index_names|
+    indexes = index_names.map { |key| meter_info[key] }.compact
+    if !indexes.empty?
       return indexes.map(&:to_i).sum
     end
   end
@@ -125,16 +134,21 @@ def write_report(report_file, meter_id, meter_split)
         "#{index}\t#{(consumption.to_f / 1000)} kWh"
       end.join("\n")
     )
+    f.write("\n")
   end
 end
 
 INDEXES = {
-  "HCJB" => "blue_off_peak",
-  "HCJW" => "white_off_peak",
-  "HCJR" => "red_off_peak",
-  "HPJB" => "blue_peak",
-  "HPJW" => "white_peak",
-  "HPJR" => "red_peak"
+  "01" => "HC BLEU",
+  "02" => "HP BLEU",
+  "03" => "HC BLANC",
+  "04" => "HP BLANC",
+  "05" => "HC ROUGE",
+  "06" => "HP ROUGE",
+  "07" => "index 7",
+  "08" => "index 8",
+  "09" => "index 9",
+  "10" => "index 10"
 }
 UNKNOWN_INDEX = "unknown"
 
@@ -148,12 +162,12 @@ line_id , special_meter_index_split = get_indexes(db, SPECIAL_METER_ID)
 record_incident(db, "read indexes from database for meter #{SPECIAL_METER_ID} from line number #{line_id}")
 
 Thread.new do
-  read_meter_info(GENERAL_METER) do |meter_info|
+  read_meter_info(GENERAL_METER, 9600) do |meter_info|
     mutex.synchronize do
-      ptec = meter_info["PTEC"]
+      ptec = meter_info["NTARF"]
       if ptec && INDEXES[ptec]
         if INDEXES[ptec] != general_meter_current_index_name
-          record_incident("Setting general meter index from #{general_meter_current_index_name} to #{INDEXES[ptec]}")
+          record_incident(db, "Setting general meter index from #{general_meter_current_index_name} to #{INDEXES[ptec]}")
         end
         general_meter_current_index_name = INDEXES[ptec]
         general_meter_current_index_time = Time.now
@@ -163,7 +177,7 @@ Thread.new do
 end
 
 Thread.new do
-  read_meter_info(SPECIAL_METER) do |meter_info|
+  read_meter_info(SPECIAL_METER, 1200) do |meter_info|
     mutex.synchronize do
       old_sum = special_meter_index_split.sum { |_, idx| idx }
       new_sum = sum_indexes(meter_info)
@@ -173,19 +187,19 @@ Thread.new do
           if delta != 0
             adjust_index(special_meter_index_split, UNKNOWN_INDEX, delta)
             save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
-            record_incident(db, "adjust unknown index from meter #{SPECIAL_METER_ID} by #{delta}Wh")
+            record_incident(db, "adjust unknown index from meter #{SPECIAL_METER_ID} by #{delta} Wh")
           end
           special_meter_index_sync = true
         else
           if delta > 0
             adjust_index(special_meter_index_split, general_meter_current_index_name, delta)
             if general_meter_current_index_name == UNKNOWN_INDEX
-              record_incident(db, "ventilate #{delta}Wh of meter #{SPECIAL_METER_ID} into the unknown index")
+              record_incident(db, "ventilate #{delta} Wh of meter #{SPECIAL_METER_ID} into the unknown index")
             end
           elsif delta < 0
             adjust_index(special_meter_index_split, UNKNOWN_INDEX, delta)
             save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
-            record_incident(db, "negative consumption of #{SPECIAL_METER_ID} of #{delta}Wh")
+            record_incident(db, "negative consumption of #{SPECIAL_METER_ID} of #{delta} Wh")
           end
         end
       end
@@ -220,6 +234,7 @@ loop do
     end
   end
 end
+
 #trame = "\x02\nADCO 811775412275 I\r\nOPTARIF HC.. <\r\nISOUSC 45 ?\r\nHCHC 004070290 \\\r\nHCHP 006438891 :\r\nPTEC HP..  \r\nIINST 004 [\r\nIMAX 090 H\r\nPAPP 01090 +\r\nHHPHC A ,\r\nMOTDETAT 000000 B\r\x03"
 #groups = trame[1..-2]
 #infos = parse_trame(groups)
