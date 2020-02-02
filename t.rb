@@ -143,7 +143,7 @@ general_meter_current_index_name = UNKNOWN_INDEX
 general_meter_current_index_time = Time.now
 special_meter_index_sync = false
 line_id , special_meter_index_split = get_indexes(db, SPECIAL_METER_ID)
-record_incident(db, "read indexes from database for meter #{SPECIAL_METER_ID} with #{line_id}")
+record_incident(db, "read indexes from database for meter #{SPECIAL_METER_ID} from line number #{line_id}")
 
 Thread.new do
   read_meter_info(GENERAL_METER) do |meter_info|
