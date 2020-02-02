@@ -117,10 +117,12 @@ end
 
 def write_report(report_file, meter_id, meter_split)
   File.open(report_file, 'wb') do |f|
-    f.write("Report for meter_id #{meter_id}\n\n")
+    f.write("Report for meter_id #{meter_id}\n")
+    f.write("Date: #{Time.now}\n")
+    f.write("\n")
     f.write(
       meter_split.map do |index, consumption|
-        "#{index}\t#{(consumption.to_f/100).round / 10} kWh"
+        "#{index}\t#{(consumption.to_f / 1000)} kWh"
       end.join("\n")
     )
   end
