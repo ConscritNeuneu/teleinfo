@@ -90,6 +90,7 @@ def sum_indexes(meter_info)
     %w(EAST),
     %w(BASE),
     %w(HCHC HCHP),
+    %w(EJPHN EJPHPM),
     %w(BBRHCJB BBRHPJB BBRHCJW BBRHPJW BBRHCJR BBRHPJR),
   ].each do |index_names|
     indexes = index_names.map { |key| meter_info[key] }.compact
