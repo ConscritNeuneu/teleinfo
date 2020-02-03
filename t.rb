@@ -155,7 +155,7 @@ INDEXES = {
   "09" => "index 9",
   "10" => "index 10"
 }
-UNKNOWN_INDEX = "unknown"
+UNKNOWN_INDEX = "INCONNU"
 
 db = setup_database(METER_DATABASE)
 
