@@ -130,13 +130,13 @@ def adjust_index(split, index_name, value)
 end
 
 REPORT_INDEXES = [
-  "HC BLEU",
-  "HP BLEU",
-  "HC BLANC",
-  "HP BLANC",
-  "HC ROUGE",
-  "HP ROUGE",
-  "INCONNU"
+  ["index_1", "HC BLEU "],
+  ["index_2", "HP BLEU "],
+  ["index_3", "HC BLANC"],
+  ["index_4", "HP BLANC"],
+  ["index_5", "HC ROUGE"],
+  ["index_6", "HP ROUGE"],
+  ["unknown", "INCONNU "]
 ]
 
 def write_report(report_file, meter_id, meter_split)
@@ -145,9 +145,9 @@ def write_report(report_file, meter_id, meter_split)
     f.write("Date: #{Time.now}\n")
     f.write("\n")
     f.write(
-      REPORT_INDEXES.map do |index|
+      REPORT_INDEXES.map do |index, friendly_name|
         consumption = meter_split[index].to_f / 1000
-        "#{index}\t#{consumption} kWh"
+        "#{friendly_name}\t#{consumption} kWh"
       end.join("\n")
     )
     f.write("\n")
@@ -155,18 +155,18 @@ def write_report(report_file, meter_id, meter_split)
 end
 
 INDEXES = {
-  "01" => "HC BLEU",
-  "02" => "HP BLEU",
-  "03" => "HC BLANC",
-  "04" => "HP BLANC",
-  "05" => "HC ROUGE",
-  "06" => "HP ROUGE",
-  "07" => "index 7",
-  "08" => "index 8",
-  "09" => "index 9",
-  "10" => "index 10"
+  "01" => "index_1",
+  "02" => "index_2",
+  "03" => "index_3",
+  "04" => "index_4",
+  "05" => "index_5",
+  "06" => "index_6",
+  "07" => "index_7",
+  "08" => "index_8",
+  "09" => "index_9",
+  "10" => "index_10"
 }
-UNKNOWN_INDEX = "INCONNU"
+UNKNOWN_INDEX = "unknown"
 
 db = setup_database(METER_DATABASE)
 
