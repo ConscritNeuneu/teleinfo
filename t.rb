@@ -129,14 +129,25 @@ def adjust_index(split, index_name, value)
   split[index_name] += value
 end
 
+REPORT_INDEXES = [
+  "HC BLEU",
+  "HP BLEU",
+  "HC BLANC",
+  "HP BLANC",
+  "HC ROUGE",
+  "HP ROUGE",
+  "INCONNU"
+]
+
 def write_report(report_file, meter_id, meter_split)
   File.open(report_file, 'wb') do |f|
     f.write("Report for meter_id #{meter_id}\n")
     f.write("Date: #{Time.now}\n")
     f.write("\n")
     f.write(
-      meter_split.map do |index, consumption|
-        "#{index}\t#{(consumption.to_f / 1000)} kWh"
+      REPORT_INDEXES.map do |index|
+        consumption = meter_split[index].to_f / 1000
+        "#{index}\t#{consumption} kWh"
       end.join("\n")
     )
     f.write("\n")
