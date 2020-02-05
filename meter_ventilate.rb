@@ -222,6 +222,7 @@ Thread.new do
 end
 
 Thread.new do
+  incident_cnt = 0
   read_meter_info(SPECIAL_METER, HISTORIC_BAUD) do |meter_info|
     mutex.synchronize do
       old_sum = special_meter_index_split.sum { |_, idx| idx }
@@ -235,12 +236,14 @@ Thread.new do
             record_incident(db, "adjust unknown index from meter #{SPECIAL_METER_ID} by #{delta} Wh")
           end
           special_meter_index_sync = true
-          puts "sync with #{delta}"
         else
           if delta > 0 && delta <= 1000
             adjust_index(special_meter_index_split, general_meter_current_index_name, delta)
             if general_meter_current_index_name == UNKNOWN_INDEX
-              record_incident(db, "ventilate #{delta} Wh of meter #{SPECIAL_METER_ID} into the unknown index")
+              if (incident_cnt % 100) == 0
+                record_incident(db, "ventilate #{delta} Wh of meter #{SPECIAL_METER_ID} into the unknown index")
+              end
+              incident_cnt += 1
             end
             puts "add #{delta} to #{general_meter_current_index_name}"
           elsif delta < 0 || delta > 1000
