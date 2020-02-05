@@ -273,6 +273,11 @@ Signal.trap("INT") do
   exit
 end
 
+Signal.trap("TERM") do
+  save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
+  exit
+end
+
 loop do
   sleep(1800)
   mutex.synchronize do
