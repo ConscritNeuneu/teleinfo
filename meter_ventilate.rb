@@ -227,7 +227,7 @@ Thread.new do
     mutex.synchronize do
       old_sum = special_meter_index_split.sum { |_, idx| idx }
       new_sum = sum_indexes(meter_info)
-      if new_sum && new_sum != 0
+      if new_sum && new_sum.is_a(Integer) && new_sum != 0
         delta = new_sum - old_sum
         if !special_meter_index_sync
           if delta != 0
