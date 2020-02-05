@@ -197,7 +197,7 @@ Thread.new do
     mutex.synchronize do
       old_sum = special_meter_index_split.sum { |_, idx| idx }
       new_sum = sum_indexes(meter_info)
-      if new_sum
+      if new_sum && new_sum != 0
         delta = new_sum - old_sum
         if !special_meter_index_sync
           if delta != 0
@@ -208,16 +208,17 @@ Thread.new do
           special_meter_index_sync = true
           puts "sync with #{delta}"
         else
-          if delta > 0
+          if delta > 0 && delta <= 1000
             adjust_index(special_meter_index_split, general_meter_current_index_name, delta)
             if general_meter_current_index_name == UNKNOWN_INDEX
               record_incident(db, "ventilate #{delta} Wh of meter #{SPECIAL_METER_ID} into the unknown index")
             end
             puts "add #{delta} to #{general_meter_current_index_name}"
-          elsif delta < 0
+          elsif delta < 0 || delta > 1000
             adjust_index(special_meter_index_split, UNKNOWN_INDEX, delta)
             save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
-            record_incident(db, "negative consumption of #{SPECIAL_METER_ID} of #{delta} Wh")
+            record_incident(db, "strange consumption of #{SPECIAL_METER_ID} of #{delta} Wh")
+            record_incident(db, "meter_info for #{SPECIAL_METER_ID} #{meter_info.to_json}")
           end
         end
       end
