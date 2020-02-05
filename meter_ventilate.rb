@@ -118,10 +118,12 @@ def sum_indexes(meter_info)
     %w(BBRHCJB BBRHPJB BBRHCJW BBRHPJW BBRHCJR BBRHPJR),
   ].each do |index_names|
     indexes = index_names.map { |key| meter_info[key] }.compact
-    if !indexes.empty?
+    if !indexes.empty? && indexes.count == index_names.count
       return indexes.map(&:to_i).sum
     end
   end
+
+  nil
 end
 
 def setup_database(meters_database)
