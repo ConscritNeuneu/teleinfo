@@ -2,6 +2,7 @@ require "json"
 require "serialport"
 require "thread"
 require "sqlite3"
+require "time"
 
 STANDARD_BAUD = 9600
 HISTORIC_BAUD = 1200
@@ -40,6 +41,29 @@ def parse_trame(trame)
   end
 
   infos
+end
+
+def parse_date(time_signed_field)
+  begin
+    teleinfo_date = time_signed_field.split("\t")[0]
+    zone = teleinfo_date[0]
+    date = teleinfo_date[1..-1]
+    zone =
+      case zone
+      when 'H', 'h'
+        '+0100'
+      when 'E', 'e'
+        '+0200'
+      when ' '
+        '+0000'
+      end
+
+    if zone
+      Time.strptime("20#{date}#{zone}", '%Y%m%d%H%M%S%z')
+    end
+  rescue
+    nil
+  end
 end
 
 def read_buf(buffer, io)
@@ -111,7 +135,7 @@ end
 
 def get_indexes(db, meter_id)
   id, indexes = db.execute('SELECT id, indexes FROM index_reports WHERE meter_id = ? ORDER BY id DESC LIMIT 1;', [meter_id]).first
-  
+
   [id, JSON.parse(indexes || '{}')]
 end
 
@@ -179,6 +203,11 @@ record_incident(db, "read indexes from database for meter #{SPECIAL_METER_ID} fr
 
 Thread.new do
   read_meter_info(GENERAL_METER, STANDARD_BAUD) do |meter_info|
+    time = parse_date(meter_info["DATE"])
+    if time && (Time.now-time).abs > 60
+      ret = system("date -s '#{time}'")
+      record_incident(db, "Trying to set time of day to #{time} with return value #{ret}")
+    end
     mutex.synchronize do
       ptec = meter_info["NTARF"]
       if ptec && INDEXES[ptec]
