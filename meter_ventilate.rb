@@ -11,7 +11,7 @@ GENERAL_METER = "/dev/ttyS0"
 SPECIAL_METER = "/dev/ttyAMA1"
 SPECIAL_METER_ID = 1
 METER_DATABASE = "/home/quentin/index_reports.sqlite3"
-REPORT_FILE = '/run/user/1000/report.txt'
+REPORT_FILE = '/run/meter_report.txt'
 
 def validate_historic(sub_group)
   data = sub_group[0..-3]
