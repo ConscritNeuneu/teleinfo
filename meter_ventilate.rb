@@ -165,10 +165,13 @@ REPORT_INDEXES = [
   ["unknown", "INCONNU "]
 ]
 
-def write_report(report_file, meter_id, meter_split)
+def write_report(report_file, meter_id, meter_split, current_index)
+  current_index_friendly_name = (REPORT_INDEXES.find { |i, name| i == current_index } || [current_index, current_index])[1]
   File.open(report_file, 'wb') do |f|
     f.write("Report for meter_id #{meter_id}\n")
     f.write("Date: #{Time.now}\n")
+    f.write("\n")
+    f.write("Index courant de ventilation: #{current_index_friendly_name}\n")
     f.write("\n")
     f.write(
       REPORT_INDEXES.map do |index, friendly_name|
@@ -266,7 +269,7 @@ Thread.new do
     mutex.synchronize do
       split = special_meter_index_split.dup
     end
-    write_report(REPORT_FILE, SPECIAL_METER_ID, split)
+    write_report(REPORT_FILE, SPECIAL_METER_ID, split, general_meter_current_index_name)
   end
 end
 
