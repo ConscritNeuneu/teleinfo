@@ -1,0 +1,14 @@
+[Unit]
+Description=Meter ventilate service
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+ExecStart=/usr/bin/env ruby /home/quentin/teleinfo/meter_ventilate.rb
+
+[Install]
+WantedBy=multi-user.target
