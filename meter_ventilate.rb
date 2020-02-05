@@ -245,7 +245,6 @@ Thread.new do
               end
               incident_cnt += 1
             end
-            puts "add #{delta} to #{general_meter_current_index_name}"
           elsif delta < 0 || delta > 1000
             adjust_index(special_meter_index_split, UNKNOWN_INDEX, delta)
             save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
