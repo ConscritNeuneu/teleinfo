@@ -200,12 +200,13 @@ UNKNOWN_INDEX = "unknown"
 db = setup_database(METER_DATABASE)
 
 mutex = Mutex.new
+threads = []
 general_meter_current_index_name = UNKNOWN_INDEX
 general_meter_current_index_time = Time.now
 line_id , special_meter_index_split = get_indexes(db, SPECIAL_METER_ID)
 record_incident(db, "read indexes from database for meter #{SPECIAL_METER_ID} from line number #{line_id}")
 
-Thread.new do
+threads << Thread.new do
   read_meter_info(GENERAL_METER, STANDARD_BAUD) do |meter_info|
     time = parse_date(meter_info["DATE"])
     if time && (Time.now-time).abs > 60
@@ -234,7 +235,7 @@ end
   break if current_index != UNKNOWN_INDEX
 end
 
-Thread.new do
+threads << Thread.new do
   incident_cnt = 0
   read_meter_info(SPECIAL_METER, HISTORIC_BAUD) do |meter_info|
     mutex.synchronize do
@@ -261,7 +262,7 @@ Thread.new do
   end
 end
 
-Thread.new do
+threads << Thread.new do
   loop do
     sleep(1800)
     mutex.synchronize do
@@ -275,7 +276,7 @@ Thread.new do
   end
 end
 
-Thread.new do
+threads << Thread.new do
   loop do
     sleep(10)
     split = nil
@@ -298,7 +299,7 @@ end
 
 loop do
   sleep(10)
-  if Thread.list.any? { |thr| !thr.status.include?(%w(sleep run)) }
+  if threads.any? { |thr| !%w(sleep run).include?(thr.status) }
     break
   end
 end
