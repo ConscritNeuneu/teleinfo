@@ -202,7 +202,6 @@ db = setup_database(METER_DATABASE)
 mutex = Mutex.new
 general_meter_current_index_name = UNKNOWN_INDEX
 general_meter_current_index_time = Time.now
-special_meter_index_sync = false
 line_id , special_meter_index_split = get_indexes(db, SPECIAL_METER_ID)
 record_incident(db, "read indexes from database for meter #{SPECIAL_METER_ID} from line number #{line_id}")
 
@@ -226,6 +225,15 @@ Thread.new do
   end
 end
 
+60.times do
+  sleep(1)
+  current_index = nil
+  mutex.synchronize do
+    current_index = general_meter_current_index_name
+  end
+  break if current_index != UNKNOWN_INDEX
+end
+
 Thread.new do
   incident_cnt = 0
   read_meter_info(SPECIAL_METER, HISTORIC_BAUD) do |meter_info|
@@ -234,28 +242,19 @@ Thread.new do
       new_sum = sum_indexes(meter_info)
       if new_sum && new_sum.is_a?(Integer) && new_sum != 0
         delta = new_sum - old_sum
-        if !special_meter_index_sync
-          if delta != 0
-            adjust_index(special_meter_index_split, UNKNOWN_INDEX, delta)
-            save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
-            record_incident(db, "adjust unknown index from meter #{SPECIAL_METER_ID} by #{delta} Wh")
-          end
-          special_meter_index_sync = true
-        else
-          if delta > 0 && delta <= 1000
-            adjust_index(special_meter_index_split, general_meter_current_index_name, delta)
-            if general_meter_current_index_name == UNKNOWN_INDEX
-              if (incident_cnt % 100) == 0
-                record_incident(db, "ventilate #{delta} Wh of meter #{SPECIAL_METER_ID} into the unknown index")
-              end
-              incident_cnt += 1
+        if delta > 0 && delta <= 1000
+          adjust_index(special_meter_index_split, general_meter_current_index_name, delta)
+          if general_meter_current_index_name == UNKNOWN_INDEX
+            if (incident_cnt % 100) == 0
+              record_incident(db, "ventilate #{delta} Wh of meter #{SPECIAL_METER_ID} into the unknown index")
             end
-          elsif delta < 0 || delta > 1000
-            adjust_index(special_meter_index_split, UNKNOWN_INDEX, delta)
-            save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
-            record_incident(db, "strange consumption of #{SPECIAL_METER_ID} of #{delta} Wh")
-            record_incident(db, "meter_info for #{SPECIAL_METER_ID} #{meter_info.to_json}")
+            incident_cnt += 1
           end
+        elsif delta < 0 || delta > 1000
+          adjust_index(special_meter_index_split, UNKNOWN_INDEX, delta)
+          save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
+          record_incident(db, "strange consumption of #{SPECIAL_METER_ID} of #{delta} Wh")
+          record_incident(db, "meter_info for #{SPECIAL_METER_ID} #{meter_info.to_json}")
         end
       end
     end
