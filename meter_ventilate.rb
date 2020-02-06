@@ -263,7 +263,21 @@ end
 
 Thread.new do
   loop do
-    sleep 10
+    sleep(1800)
+    mutex.synchronize do
+      save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
+      if (Time.now - general_meter_current_index_time) >= 1800
+        general_meter_current_index_name = UNKNOWN_INDEX
+        general_meter_current_index_time = Time.now
+        record_incident(db, "Reverting general meter index to unknown. Last update was #{general_meter_current_index_update}.")
+      end
+    end
+  end
+end
+
+Thread.new do
+  loop do
+    sleep(10)
     split = nil
     mutex.synchronize do
       split = special_meter_index_split.dup
@@ -283,19 +297,10 @@ Signal.trap("TERM") do
 end
 
 loop do
-  sleep(1800)
-  mutex.synchronize do
-    save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
-    if (Time.now - general_meter_current_index_time) >= 1800
-      general_meter_current_index_name = UNKNOWN_INDEX
-      general_meter_current_index_time = Time.now
-      record_incident(db, "Reverting general meter index to unknown. Last update was #{general_meter_current_index_update}.")
-    end
+  sleep(10)
+  if Thread.list.any? { |thr| !thr.status.include?(%w(sleep run)) }
+    break
   end
 end
 
-#trame = "\x02\nADCO 811775412275 I\r\nOPTARIF HC.. <\r\nISOUSC 45 ?\r\nHCHC 004070290 \\\r\nHCHP 006438891 :\r\nPTEC HP..  \r\nIINST 004 [\r\nIMAX 090 H\r\nPAPP 01090 +\r\nHHPHC A ,\r\nMOTDETAT 000000 B\r\x03"
-#groups = trame[1..-2]
-#infos = parse_trame(groups)
-
-#puts JSON.pretty_generate(infos)
+save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
