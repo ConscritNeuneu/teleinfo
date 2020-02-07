@@ -197,6 +197,8 @@ INDEXES = {
 }
 UNKNOWN_INDEX = "unknown"
 
+STDOUT.sync = true
+
 db = setup_database(METER_DATABASE)
 
 mutex = Mutex.new
