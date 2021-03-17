@@ -1,12 +1,12 @@
 Report for meter_id 1
-Date: 2020-02-14 23:14:21 +0100
+Date: 2021-03-16 19:39:37 +0100
 
-Index courant de ventilation: HC BLANC
+Index courant de ventilation: HP BLANC
 
-HC BLEU 	0.0 kWh
-HP BLEU 	0.036 kWh
+HC BLEU 	0.123 kWh
+HP BLEU 	0.34 kWh
 HC BLANC	0.041 kWh
-HP BLANC	0.035 kWh
+HP BLANC	0.482 kWh
 HC ROUGE	0.047 kWh
 HP ROUGE	0.166 kWh
 INCONNU 	1628.134 kWh
