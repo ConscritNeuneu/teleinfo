@@ -3,6 +3,11 @@ sudo ip link set eth0 dynamic on
 sudo ip link set eth0 addrgenmode eui64
 ssh quentin@fe80::844f:b18b:73a1:d350%eth0
 
+nmcli device set enx0050b615af66 managed no
+sudo ip link set enx0050b615af66 dynamic on
+sudo ip link set enx0050b615af66 addrgenmode eui64
+ssh quentin@fe80::844f:b18b:73a1:d350%enx0050b615af66
+
 add meter_ventilate.service to /etc/systemd/system/meter_ventilate.service
 systemctl start meter_ventilate
 systemctl enable meter_ventilate
