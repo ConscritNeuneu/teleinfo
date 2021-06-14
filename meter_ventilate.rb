@@ -12,6 +12,7 @@ SPECIAL_METER = "/dev/ttyAMA1"
 SPECIAL_METER_ID = 1
 METER_DATABASE = "/home/quentin/index_reports.sqlite3"
 REPORT_FILE = '/run/meter_report.txt'
+REPORT_PATRICE = '/run/report_patrice.csv'
 
 def validate_historic(sub_group)
   data = sub_group[0..-3]
@@ -183,6 +184,26 @@ def write_report(report_file, meter_id, meter_split, current_index)
   end
 end
 
+def report_patrice_line(time, split)
+  ([time] + REPORT_INDEXES.map { |i,_| split[i].to_f / 1000 }).join(";") + "\n"
+end
+
+def write_report_patrice(report_file, lines_raw, current_split)
+  File.open(report_file, 'wb') do |f|
+    f.write("date;Bleu HC;Bleu HP;Blanc HC;Blanc HP;Rouge HC;Rouge HP;Inconnu\n")
+    current_day = 0
+    lines_raw.reverse_each do |entry|
+      time = Time.strptime("#{entry[0]}Z", '%Y-%m-%d %H:%M:%S%z').getlocal
+      day = time.strftime("%Y%j").to_i
+      if day > current_day
+        current_day = day
+        f.write(report_patrice_line(time, JSON.parse(entry[1])))
+      end
+    end
+    f.write(report_patrice_line(Time.now, current_split))
+  end
+end
+
 INDEXES = {
   "01" => "index_1",
   "02" => "index_2",
@@ -286,6 +307,19 @@ threads << Thread.new do
       split = special_meter_index_split.dup
     end
     write_report(REPORT_FILE, SPECIAL_METER_ID, split, general_meter_current_index_name)
+  end
+end
+
+threads << Thread.new do
+  loop do
+    lines_raw = nil
+    current_split = nil
+    mutex.synchronize do
+      lines_raw = db.execute("SELECT created_at, indexes FROM index_reports WHERE meter_id = ? ORDER BY id DESC LIMIT 10000;", SPECIAL_METER_ID)
+      current_split = special_meter_index_split.dup
+    end
+    write_report_patrice(REPORT_PATRICE, lines_raw, current_split)
+    sleep(3600)
   end
 end
 
