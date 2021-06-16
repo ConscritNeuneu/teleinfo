@@ -204,6 +204,10 @@ def write_report_patrice(report_file, lines_raw, current_split)
   end
 end
 
+def sleep_next_half_hour_mark
+  sleep(1800 - Time.now.to_i % 1800)
+end
+
 INDEXES = {
   "01" => "index_1",
   "02" => "index_2",
@@ -287,7 +291,7 @@ end
 
 threads << Thread.new do
   loop do
-    sleep(1800)
+    sleep_next_half_hour_mark()
     mutex.synchronize do
       save_indexes(db, SPECIAL_METER_ID, special_meter_index_split)
       if (Time.now - general_meter_current_index_time) >= 1800
