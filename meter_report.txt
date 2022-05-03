@@ -1,10 +1,10 @@
 Report for meter_id 1
-Date: 2022-04-01 15:58:46 +0200
+Date: 2022-05-03 22:02:37 +0200
 
-Index courant de ventilation: HP BLEU 
+Index courant de ventilation: HC BLEU 
 
-HC BLEU 	1549.226 kWh
-HP BLEU 	120.783 kWh
+HC BLEU 	1695.138 kWh
+HP BLEU 	120.903 kWh
 HC BLANC	37.963 kWh
 HP BLANC	1.802 kWh
 HC ROUGE	2.911 kWh
