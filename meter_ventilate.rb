@@ -7,8 +7,8 @@ require "time"
 STANDARD_BAUD = 9600
 HISTORIC_BAUD = 1200
 
-GENERAL_METER = "/dev/ttyS0"
-SPECIAL_METER = "/dev/ttyAMA1"
+GENERAL_METER = "/dev/ttyAMA0"
+SPECIAL_METER = "/dev/ttyUSB0"
 SPECIAL_METER_ID = 1
 METER_DATABASE = "/home/quentin/index_reports.sqlite3"
 REPORT_FILE = '/run/meter_report.txt'
